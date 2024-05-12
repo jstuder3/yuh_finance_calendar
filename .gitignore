@@ -162,3 +162,5 @@ cython_debug/
 *.pdf
 .env
 *.ics
+client_secrets.json
+token.json

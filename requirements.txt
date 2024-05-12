@@ -1,0 +1,7 @@
+notion_client
+pdfplumber
+python-dotenv
+ics
+google-api-python-client 
+google-auth-httplib2
+google-auth-oauthlib

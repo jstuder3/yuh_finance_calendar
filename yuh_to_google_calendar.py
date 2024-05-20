@@ -10,7 +10,11 @@ from utils.yuh_pdf_converter import YuhPdfConverter
 from dotenv import load_dotenv
 load_dotenv()
 
-pdf_path_list = ["pdfs/yuh_jan_2024.pdf", "pdfs/yuh_feb_2024.pdf", "pdfs/yuh_mar_2024.pdf", "pdfs/yuh_apr_2024.pdf"]
+def listdir_fullpath(d):
+    return [os.path.join(d, f) for f in os.listdir(d)]
+
+# pdf_path_list = ["pdfs/yuh_jan_2024.pdf", "pdfs/yuh_feb_2024.pdf", "pdfs/yuh_mar_2024.pdf", "pdfs/yuh_apr_2024.pdf"]
+pdf_path_list = listdir_fullpath("pdfs")
 converter = YuhPdfConverter(pdf_path_list)
 transactions = converter.get_all_transactions()
 
@@ -37,31 +41,51 @@ service = build('calendar', 'v3', credentials=creds)
 
 # uncomment to find ID of your calendar
 # calendars = service.calendarList().list().execute()
-
 # for calendar_list_entry in calendars['items']:
 #     print(f"Calendar Name: {calendar_list_entry['summary']}, ID: {calendar_list_entry['id']}")
 
-# remove all events from the calendar, then add new events
-page_token = None
-while True:
-    events_result = service.events().list(calendarId=CALENDAR_ID, pageToken=page_token).execute()  # Adjust calendarId if needed
-    events = events_result.get('items', [])
-    for i, event in enumerate(events):
-        print(f"Deleting event {i+1}/{len(events)}...", end='\r')
-        sys.stdout.flush()
-        service.events().delete(calendarId=CALENDAR_ID, eventId=event['id']).execute()
-    page_token = events_result.get('nextPageToken')
-    if not page_token:
-        break
-print("All events deleted!")
-
 color_map = {
-    'small': 5,   # Example: Lavender
+    'small': 5,
     'medium': 6,
-    'large': 11,  # Example: Grape
-    #'very_large': 11, # Example: Tomato
+    'large': 11,
     "income": 10,
 }
+
+def get_color(amount, currency):
+    if currency == "DKK":
+        amount = amount / 7.5
+    if amount >= 0:
+        return color_map["income"]
+    if amount < 0:
+        if amount > -50:
+            return color_map['small']
+        elif amount > -200:
+            return color_map['medium']
+        else:
+            return color_map['large']
+
+page_token = None
+all_existing_events = []
+print("Fetching all existing events...")
+while True:
+    existing_events = service.events().list(calendarId=CALENDAR_ID, pageToken=page_token).execute()
+    for i, event in enumerate(existing_events["items"]):
+        sys.stdout.flush()
+        all_existing_events.append(event)
+    page_token = existing_events.get('nextPageToken')
+    if not page_token:
+        break
+event_hashes = [hash(event['summary'] + ' ' + event['description']) for event in all_existing_events]
+print(f"All events fetched! Found {len(all_existing_events)} existing events in total!")
+
+# optional: delete all previously existing events
+delete_all_events = False
+if delete_all_events:
+    for i, event in enumerate(all_existing_events):
+        print(f"Deleting event {i+1}/{len(all_existing_events)}...", end='\r')
+        sys.stdout.flush()
+        service.events().delete(calendarId=CALENDAR_ID, eventId=event['id']).execute()
+    event_hashes = []
 
 for i, transaction in enumerate(transactions):
     print(f"Adding event {i+1}/{len(transactions)}...", end='\r')
@@ -73,19 +97,15 @@ for i, transaction in enumerate(transactions):
         'end': {'date': transaction['date'], 'timeZone': 'Europe/Zurich'},
         'description':f"Amount: {'+' if transaction['amount'] > 0 else ''}{transaction['amount']:.2f} {transaction['currency']}\nSaldo: {'+' if transaction['saldo'] > 0 else ''}{transaction['saldo']:.2f} {transaction['currency']}"
     }
+    
+    # skip if event is already in calendar
+    event_hash = hash(event['summary'] + ' ' + event['description'])
+    if event_hash in event_hashes:
+        continue
 
-    amount = transaction['amount']
-    if amount >= 0:
-        event["colorId"] = color_map["income"]
-    if amount < 0:
-        if amount > -50:
-            event['colorId'] = color_map['small']
-        elif amount > -200:
-            event['colorId'] = color_map['medium']
-        else:
-            event['colorId'] = color_map['large']
-
+    event["colorId"] = get_color(transaction['amount'], transaction["currency"])
+    
     # print(event)
     created_event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
-    
+print()
 print("Finished!")

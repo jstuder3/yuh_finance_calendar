@@ -11,10 +11,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def listdir_fullpath(d):
-    return [os.path.join(d, f) for f in os.listdir(d)]
+    return [os.path.join(d, f) for f in os.listdir(d) if ".gitkeep" not in f]
 
 # pdf_path_list = ["pdfs/yuh_jan_2024.pdf", "pdfs/yuh_feb_2024.pdf", "pdfs/yuh_mar_2024.pdf", "pdfs/yuh_apr_2024.pdf"]
 pdf_path_list = listdir_fullpath("pdfs")
+print(f"Found {len(pdf_path_list)} pdf files in pdfs folder!")
 converter = YuhPdfConverter(pdf_path_list)
 transactions = converter.get_all_transactions()
 
@@ -31,7 +32,7 @@ if not creds or not creds.valid:
         creds.refresh(Request())
     else:
         # Use client_secrets.json here
-        flow = InstalledAppFlow.from_client_secrets_file('client_secrets.json', SCOPES)  
+        flow = InstalledAppFlow.from_client_secrets_file('client_secret.json', SCOPES)  
         creds = flow.run_local_server(port=0)
     # Save the credentials for the next run
     with open('token.json', 'w') as token:

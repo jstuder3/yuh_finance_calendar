@@ -1,13 +1,18 @@
+import os
+import sys
+import calendar
+
+from collections import defaultdict
+from datetime import datetime
+from dotenv import load_dotenv
+
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
-import os
-import sys
 
 from utils.yuh_pdf_converter import YuhPdfConverter
 
-from dotenv import load_dotenv
 load_dotenv()
 
 def listdir_fullpath(d):
@@ -66,6 +71,35 @@ def get_color(amount, currency):
         else:
             return color_map['large']
 
+
+
+# Initialize dictionaries to store sums of income and expenses for each month
+monthly_income = defaultdict(lambda: defaultdict(float))
+monthly_expenses = defaultdict(lambda: defaultdict(float))
+
+# Process each transaction
+for transaction in transactions:
+    # Extract the month and year from the transaction date
+    date = datetime.strptime(transaction['date'], '%Y-%m-%d')
+    month_year = date.strftime('%Y-%m')
+    currency = transaction['currency']
+
+    # Update the sums based on the transaction amount
+    if transaction['amount'] > 0:
+        monthly_income[month_year][currency] += transaction['amount']
+    else:
+        monthly_expenses[month_year][currency] += abs(transaction['amount'])
+
+# Print out the sums for each month and currency
+print("Monthly Income and Expenses:")
+for month_year in sorted(set(monthly_income.keys()).union(monthly_expenses.keys())):
+    print(f"{month_year}:")
+    currencies = set(monthly_income[month_year].keys()).union(monthly_expenses[month_year].keys())
+    for currency in currencies:
+        income = monthly_income[month_year][currency]
+        expenses = -monthly_expenses[month_year][currency]
+        print(f"  {currency}: Income = {income:.2f}, Expenses = {expenses:.2f}")
+
 page_token = None
 all_existing_events = []
 print("Fetching all existing events...")
@@ -109,5 +143,54 @@ for i, transaction in enumerate(transactions):
     
     # print(event)
     created_event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+
 print()
-print("Finished!")
+print("Finished adding regular events. Adding monthly summaries now...")
+
+for month_year in sorted(set(monthly_income.keys()).union(monthly_expenses.keys())):
+    currencies = set(monthly_income[month_year].keys()).union(monthly_expenses[month_year].keys())
+    
+    # Calculate the last day of the month
+    year, month = map(int, month_year.split('-'))
+    last_day = calendar.monthrange(year, month)[1]
+    last_date = datetime(year, month, last_day).strftime('%Y-%m-%d')
+
+    # Create the description for the summarized monthly expenses
+    expense_description = "\n".join([f"{currency}: {monthly_expenses[month_year][currency]:.2f}" for currency in monthly_expenses[month_year]])
+    income_description = "\n".join([f"{currency}: {monthly_income[month_year][currency]:.2f}" for currency in monthly_income[month_year]])
+
+    # Check if the expense summary event already exists
+    expense_summary = f"Monthly Expenses Summary for {month_year}"
+    expense_event_exists = any(event['summary'] == expense_summary and event['start']['date'] == last_date for event in all_existing_events)
+
+    if not expense_event_exists:
+        # Create a calendar event for the summarized monthly expenses
+        expense_event = {
+            'summary': expense_summary,
+            'start': {'date': last_date, 'timeZone': 'Europe/Zurich'},
+            'end': {'date': last_date, 'timeZone': 'Europe/Zurich'},
+            'description': f"Total expenses for {month_year}:\n{expense_description}",
+            'colorId': color_map['large']
+        }
+
+        # Add the event to the Google Calendar
+        created_event = service.events().insert(calendarId=CALENDAR_ID, body=expense_event).execute()
+
+    # Check if the income summary event already exists
+    income_summary = f"Monthly Income Summary for {month_year}"
+    income_event_exists = any(event['summary'] == income_summary and event['start']['date'] == last_date for event in all_existing_events)
+
+    if not income_event_exists:
+        # Create a calendar event for the summarized monthly income
+        income_event = {
+            'summary': income_summary,
+            'start': {'date': last_date, 'timeZone': 'Europe/Zurich'},
+            'end': {'date': last_date, 'timeZone': 'Europe/Zurich'},
+            'description': f"Total income for {month_year}:\n{income_description}",
+            'colorId': color_map['income']
+        }
+
+        # Add the event to the Google Calendar
+        created_event = service.events().insert(calendarId=CALENDAR_ID, body=income_event).execute()
+
+print("Finished adding summarized monthly income and expenses to the calendar.")

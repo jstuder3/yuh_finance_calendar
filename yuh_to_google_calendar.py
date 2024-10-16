@@ -35,11 +35,18 @@ if os.path.exists('token.json'):  # Check for existing token
     creds = Credentials.from_authorized_user_file('token.json', SCOPES)
 if not creds or not creds.valid:
     if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-    else:
+        try:
+            creds.refresh(Request())
+        except:
+            print("Failed to refresh credentials. Removing and asking for new ones...")
+            creds=None
+            os.remove('token.json')
+    elif creds is None:
         # Use client_secrets.json here
         flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)  
         creds = flow.run_local_server(port=0)
+    else:
+        print("Oops! Something unexpected happened, you should not be here!")
     # Save the credentials for the next run
     with open('token.json', 'w') as token:
         token.write(creds.to_json())

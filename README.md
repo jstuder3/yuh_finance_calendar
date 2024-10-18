@@ -1,6 +1,7 @@
 # yuh_finance_calendar
 
 Use this to turn a Yuh Account Overview PDF into calendar entries for use with different services.
+Note: This still works as of October 2024, but Yuh has recently added CSV file exports, so there would be a much more straightforward way to add expenses than by dissecting PDFs. Better late than never, thanks Yuh ;)
 
 ## Example
 ---------------

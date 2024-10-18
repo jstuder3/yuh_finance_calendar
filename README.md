@@ -39,7 +39,7 @@ to directly import events to a calendar, which will also enable color coding. Se
  - Get a client_secrets.json file from console.cloud.google.com -> WhateverYouCalledYourProject -> APIs and Services (APIs und Dienste) -> Credentials(?)/Anmeldedaten -> Create OAuth 2.0 key if you're on a new device -> download the json and rename it to client_secrets.json, pull it into the root directory
 
 ### Now for the fun part:
- - Pull PDFs into /pdfs folder
+ - Pull PDFs into /pdfs folder or specify the pdfs folder in your .env using PDF_PATH=...
  - Run script with `python yuh_to_google_calendar.py`, log in through google stuff, this will generate a `token.json` file
  - Let it run
  - ???
@@ -47,5 +47,5 @@ to directly import events to a calendar, which will also enable color coding. Se
 
 Whenever you have a new pdf, you can just pull it into the pdfs folder again. The script will check for existing events, so you don't have to delete your old pdfs.
 
-Quick fix for issues:
+### Quick fix for issues:
 - If you get some kind of authorization issue, delete `token.json` and try again.
